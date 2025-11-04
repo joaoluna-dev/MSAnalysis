@@ -4,6 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pubchempy as pcp
+from tornado.httpclient import HTTPError
+
 
 def parse_table_files(filepath, extension, threshold, filename):
     if extension == ".xlsx":
@@ -70,6 +72,19 @@ def get_smiles(mol, smilesfile):
             sm_file.write(f"A busca pela molécula {mol} não retornou resultados. Tente novamente manualmente mais tarde.\n")
             sm_file.write("-------------------------------------------\n")
 
+def get_sdf(mol, filesfolder):
+    print(f"Iniciando o download da molécula {mol}...")
+    mol_file = str(os.path.join(filesfolder, f"{mol}.sdf"))
+    try:
+        pcp.download("SDF", mol_file, mol, "name")
+        if os.path.getsize(mol_file) == 0:
+            print(f"O arquivo {mol} não foi baixado. Tente novamente manualmente mais tarde.")
+        else:
+            print(f"O arquivo {mol} foi baixado.")
+    except OSError:
+        print(f"O arquivo {mol_file} já existe. Pulando download...")
+    except HTTPError:
+        print(f"O arquivo {mol} não foi localizado na base de dados do PUBCHEM.")
 
 def main():
     while True: #Loop principal
@@ -159,6 +174,15 @@ def main():
                         continue
         print("Análise das replicatas concluída.")
 
+        #Verificação do preenchimento de data_groups, e assimilação de dados caso não haja estudo das replicatas
+        if len(data_groups) == 0:
+            summary_table = pd.ExcelFile(summary_file)
+            available_samples = summary_table.sheet_names
+            available_samples.sort()
+            for sample in available_samples:
+                df = summary_table.parse(sample)
+                data_groups[sample] = df['Library Match'].tolist()
+
         #Criação de pasta que conterá os arquivos .SDF das moléculas
         sdf_folder = os.path.join(input_folder, "SDF_files")
         if not os.path.exists(sdf_folder):
@@ -172,13 +196,16 @@ def main():
         #Parsing do dicionário com as moléculas de cada amostra
         for chave in data_groups:
             print(f"Analisando amostra {chave}...")
+            sample_sdf_folder = os.path.join(sdf_folder, chave)
+            if not os.path.exists(sample_sdf_folder):
+                os.mkdir(sample_sdf_folder)
             data_molecules = data_groups[chave] #Obtém a lista de moléculas relacionadas à cada estudo de replicatas/amostra isolada
             with open(smiles_file, 'a') as sm_file:
                 sm_file.write(f"{chave}:\n")
                 sm_file.write("\n")
                 for molecule in data_molecules: #Itera sobre as moléculas de cada lista
                     get_smiles(mol=molecule, smilesfile=smiles_file) #Obtém os SMILES e o CID de cada molécula
-                    # get_sdf(mol=molecule, filesfolder=sdf_folder) #Obtém o arquivo .SDF de cada molécula
+                    get_sdf(mol=molecule, filesfolder=sample_sdf_folder) #Obtém o arquivo .SDF de cada molécula
         print("Dados das moléculas obtidos no PUBCHEM.")
 
 
