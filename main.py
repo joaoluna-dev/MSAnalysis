@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pubchempy as pcp
 
 def parse_table_files(filepath, extension, threshold, filename):
     if extension == ".xlsx":
@@ -43,10 +44,32 @@ def unite_data(summary, repslist, extension, colname, allreps):
             print(f"A replicata {rep} não foi localizada, tente novamente.")
             return "\n"
     mol_list = list(molnames)
-    mol_string = ", ".join(mol_list)
+    mol_string = "/".join(mol_list)
     new_item = f"{colname}: {mol_string}\n"
     print(new_item)
     return new_item
+
+def get_smiles(mol, smilesfile):
+    print(f"Obtendo dados da molécula {mol}...")
+    compound = pcp.get_compounds(mol, "name")
+    if len(compound) > 0:
+        compound = compound[0]
+        if compound:
+            with open(smilesfile, 'a') as sm_file:
+                sm_file.write(f"{mol}\n")
+                sm_file.write(f"CID: {compound.cid}\n")
+                sm_file.write(f"SMILES: {compound.smiles}\n")
+                sm_file.write("-------------------------------------------\n")
+            print(f"SMILES e CID de {mol} obtidos.")
+        else:
+            print(f"Molécula {mol} não identificada no PUBCHEM. Verifique e tente novamente manualmente.")
+    else:
+        print(f"A busca pela molécula {mol} não retornou resultados. Tente novamente manualmente mais tarde.")
+        with open(smilesfile, 'a') as sm_file:
+            sm_file.write(f"{mol}\n")
+            sm_file.write(f"A busca pela molécula {mol} não retornou resultados. Tente novamente manualmente mais tarde.\n")
+            sm_file.write("-------------------------------------------\n")
+
 
 def main():
     while True: #Loop principal
@@ -77,7 +100,8 @@ def main():
 
         #Cria pasta onde estarão os gráficos, plots
         plot_folder = os.path.join(input_folder, "plots")
-        os.mkdir(plot_folder)
+        if not os.path.exists(plot_folder):
+            os.mkdir(plot_folder)
 
         #Leitura dos arquivos, filtragem das moléculas, plotagem dos gráficos e escrita em arquivo com as moléculas selecionadas
         with pd.ExcelWriter(summary_file, engine='openpyxl') as writer: #Abre o arquivo que contém as moléculas selecionadas
@@ -102,9 +126,10 @@ def main():
             mol_file.write("\n")
 
         #Obtém as replicatas do estudo
-        available_reps = pd.ExcelFile("Resumo_análises.xlsx").sheet_names
+        available_reps = pd.ExcelFile(summary_file).sheet_names
 
         #Escrita das moléculas comuns às replicatas da amostra
+        data_groups = {}
         with open(joined_molecules_file, "a") as mol_file:
             while True:
                 #Exibe todas as replicatas disponíveis no estudo
@@ -119,6 +144,8 @@ def main():
                     data_group = unite_data(summary=summary_file, repslist=reps_list, extension=".xlsx", colname=reps_string, allreps=available_reps) #Passa para a função que faz a comparação entre as replicatas da amostra, para entender quais moléculas estão presentes nas análises, e reunir sem duplicatas
                     mol_file.write(data_group) #Escreve os dados obtidos (replicatas: moléculas)
                     mol_file.write("\n") #Escreve quebra de linha para facilitar a leitura
+                    data_group_list = data_group.split(":")
+                    data_groups[data_group_list[0]] = data_group_list[1].split("/")
                     print(f"Replicatas {reps_string} analisadas.")
                     continue
                 else: #Caso não haja o input (usuário apertou enter, decidindo encerrar)
@@ -131,6 +158,30 @@ def main():
                         print(f"Seleção inválida: {selection_finish_reps}")
                         continue
         print("Análise das replicatas concluída.")
+
+        #Criação de pasta que conterá os arquivos .SDF das moléculas
+        sdf_folder = os.path.join(input_folder, "SDF_files")
+        if not os.path.exists(sdf_folder):
+            os.mkdir(sdf_folder)
+
+        #Criação de arquivo com os SMILES das moléculas
+        smiles_file = os.path.join(input_folder, "SMILES.txt")
+        with open(smiles_file, 'w') as sm_file:
+            sm_file.write("Moléculas e seus smiles: \n")
+
+        #Parsing do dicionário com as moléculas de cada amostra
+        for chave in data_groups:
+            print(f"Analisando amostra {chave}...")
+            data_molecules = data_groups[chave] #Obtém a lista de moléculas relacionadas à cada estudo de replicatas/amostra isolada
+            with open(smiles_file, 'a') as sm_file:
+                sm_file.write(f"{chave}:\n")
+                sm_file.write("\n")
+                for molecule in data_molecules: #Itera sobre as moléculas de cada lista
+                    get_smiles(mol=molecule, smilesfile=smiles_file) #Obtém os SMILES e o CID de cada molécula
+                    # get_sdf(mol=molecule, filesfolder=sdf_folder) #Obtém o arquivo .SDF de cada molécula
+        print("Dados das moléculas obtidos no PUBCHEM.")
+
+
 
 if __name__ == '__main__':
     main()
