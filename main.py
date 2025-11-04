@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 def parse_table_files(filepath, extension, threshold, filename):
     if extension == ".xlsx":
@@ -15,15 +16,20 @@ def parse_table_files(filepath, extension, threshold, filename):
             df = pd.DataFrame()
     return df
 
-def plot_data(df, file_name):
-    df20 = df.head(20)
-    confidence_score = df20['Confidence']
-    mol_name = df20['Library Match']
-    plt.barh(mol_name, confidence_score, color="#4CAF50")
-    plt.xlabel("Moléculas encontradas")
-    plt.ylabel("Confiança", fontsize=5)
-    plt.title(f"Top 20 moléculas com maior escore de confiança em {file_name}")
-    plt.savefig(f"{file_name}.tiff", dpi=300)
+def plot_data(df, file_name, plotfolder):
+    print(f"Iniciando plotagem de {file_name}...")
+    df = df.sort_values(by='Confidence', ascending=False)
+    confidence_score = df['Confidence']
+    mol_name = df['Library Match']
+    plt.figure(figsize=(17,10))
+    mol_plot = sns.barplot(x=confidence_score, y=mol_name, orient='h')
+    mol_plot.set_xlabel("Confiança")
+    plt.ylabel("Moléculas")
+    mol_plot.set_title(f"Moléculas X escore de confiança em {file_name}")
+    plt.tight_layout()
+    plt.savefig(os.path.join(plotfolder, f"{file_name}.tiff"), dpi=300, format='tiff', bbox_inches='tight')
+    plt.close()
+    print(f'Gráfico {file_name} criado.')
 
 def unite_data(summary, repslist, extension, colname, allreps):
     molnames = set()
@@ -69,7 +75,11 @@ def main():
             print("O diretório inserido não possui nenhum arquivo do tipo especificado.")
             continue
 
-        #Leitura dos arquivos, filtragem das moléculas e escrita em arquivo com as moléculas selecionadas
+        #Cria pasta onde estarão os gráficos, plots
+        plot_folder = os.path.join(input_folder, "plots")
+        os.mkdir(plot_folder)
+
+        #Leitura dos arquivos, filtragem das moléculas, plotagem dos gráficos e escrita em arquivo com as moléculas selecionadas
         with pd.ExcelWriter(summary_file, engine='openpyxl') as writer: #Abre o arquivo que contém as moléculas selecionadas
             for table in table_files: #Itera sobre os arquivos da extensão selecionada no diretório definido pelo usuário
                 print(f"Analisando: {table}...")
@@ -79,7 +89,7 @@ def main():
                     print(f"O arquivo {table} está vazio. Verifique o conteúdo do arquivo.")
                     continue
                 filtered_file = parse_table_files(filepath=file_path, extension=extension_type, threshold=threshold, filename=file_name) #Passa o arquivo para a função filtered_table, que lê os arquivos e filtra as moléculas com base no threshold definido
-                plot_data(df=filtered_file, file_name=file_name) #Plota o gráfico com os dados obtidos nos arquivos
+                plot_data(df=filtered_file, file_name=file_name, plotfolder=plot_folder) #Plota o gráfico com os dados obtidos nos arquivos na pasta de trabalho, em uma pasta plots
                 filtered_file.to_excel(writer, sheet_name=file_name, index=False) #Escreve as moléculas no arquivo de moléculas selecionadas
         print("Análise dos arquivos concluída.")
 
