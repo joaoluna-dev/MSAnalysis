@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 import os
 import pandas as pd
@@ -83,35 +84,59 @@ def get_sdf(mol, filesfolder):
             print(f"O arquivo {mol} foi baixado.")
     except OSError:
         print(f"O arquivo {mol_file} já existe. Pulando download...")
+    except pcp.NotFoundError:
+        print(f"⚠️ Molécula '{mol}' não encontrada no PubChem. Pulando...")
+    except pcp.PubChemHTTPError as e:
+        print(f"Erro HTTP do PubChem: {e}")
     except HTTPError:
         print(f"O arquivo {mol} não foi localizado na base de dados do PUBCHEM.")
+    except Exception as e:
+        print(f"Erro inesperado: {e}")
 
 def main():
     while True: #Loop principal
-
-        #Obtenção do diretório com os dados de análise de GC-MS, e limiar de análise
-        input_folder = Path(input("Insira o caminho da pasta com as planilhas obtidas da análise de GC-MS: "))
-        if not os.path.exists(input_folder):
-            print("O caminho inserido não existe. Tente novamente.")
-            continue
-        extension_type = input("Insira o formato dos arquivos das planilhas, com ponto (ex: .xlsx): ").lower()
-        while True:
-            threshold = int(input("Insira o limiar de match dos compostos para a análise (ex: 70, 90, 100...): "))
-            if threshold > 100:
-                print(f"Limiar inválido inserido: {threshold}")
+        #Obtenção do diretório com os dados de análise de GC-MS, extensões dos arquivos e limiar de análise
+        try:
+            #Obtenção do endereço do diretório com os arquivos tabulares processados das análises
+            input_folder = Path(input("Insira o caminho da pasta com as planilhas obtidas da análise de GC-MS: ").strip('"'))
+            #Obtenção do tipo de extensão dos arquivos na pasta
+            extension_type = input("Insira o formato dos arquivos das planilhas, com ponto (ex: .xlsx): ").lower()
+            supported_extensions = [
+                ".csv", ".tsv", ".txt", ".xls", ".xlsx", ".xlsm", ".xlt", ".xltx",
+                ".ods", ".odt", ".dbf", ".sav", ".sas7bdat", ".dta", ".parquet",
+                ".feather", ".arrow", ".json", ".ndjson", ".xml", ".sqlite", ".db",
+                ".csv.gz", ".tsv.gz", ".zip", ".gz", ".bz2"]
+            if extension_type not in supported_extensions:
+                print(f"A extensão {extension_type} não é compatível. As extensões compatíveis são: {",".join(supported_extensions)}.")
                 continue
-            else:
-                break
+            while True:
+                threshold = int(input("Insira o limiar de match dos compostos para a análise (ex: 70, 90, 100...): "))
+                if threshold > 100:
+                    print(f"Limiar inválido inserido: {threshold}")
+                    continue
+                else:
+                    break
+            table_files = [file for file in os.listdir(input_folder) if
+                           extension_type in file and "~" not in file and "#" not in file]  # Lê os arquivos da extensão selecionada pelo usuário, no diretório fornecido
+            print(f"Arquivos localizados: {table_files}")
+            if len(table_files) == 0:  # Caso não hajam arquivos do tipo especificado pelo usuário
+                print("O diretório inserido não possui nenhum arquivo do tipo especificado.")
+                continue
+
+        except FileNotFoundError:
+            print("O diretório inserido não existe. Tente novamente.")
+            continue
+        except NotADirectoryError:
+            print("O Caminho inserido não é um diretório. Tente novamente.")
+            continue
+        except ValueError as e:
+            print(f"Valor inválido inserido: {e}")
+        except Exception as e:
+            print(f"Erro inesperado: {e}")
+            continue
 
         #Criar arquivo xlsx que conterá as moléculas selecionadas
         summary_file = os.path.join(input_folder, "Resumo_análises.xlsx")
-
-        #Leituras de arquivos com os dados de análise de GC-MS
-        table_files = [file for file in os.listdir(input_folder) if extension_type in file and "~" not in file and "#" not in file] #Lê os arquivos da extensão selecionada pelo usuário, no diretório fornecido
-        print(f"Arquivos localizados: {table_files}")
-        if len(table_files) == 0: #Caso não hajam arquivos do tipo especificado pelo usuário
-            print("O diretório inserido não possui nenhum arquivo do tipo especificado.")
-            continue
 
         #Cria pasta onde estarão os gráficos, plots
         plot_folder = os.path.join(input_folder, "plots")
@@ -207,8 +232,14 @@ def main():
                     get_smiles(mol=molecule, smilesfile=smiles_file) #Obtém os SMILES e o CID de cada molécula
                     get_sdf(mol=molecule, filesfolder=sample_sdf_folder) #Obtém o arquivo .SDF de cada molécula
         print("Dados das moléculas obtidos no PUBCHEM.")
-
-
+        restart_selection = input("Análise finalizada. Deseja realizar outro estudo? (y/n): ").lower()
+        if restart_selection == "y":
+            continue
+        elif restart_selection == "n":
+            sys.exit(0)
+        else:
+            print(f"Seleção inválida: {restart_selection}. Encerrando execução...")
+            sys.exit(1)
 
 if __name__ == '__main__':
     main()
