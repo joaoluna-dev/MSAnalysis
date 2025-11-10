@@ -47,9 +47,8 @@ def unite_data(summary, repslist, extension, colname, allreps):
             print(f"A replicata {rep} não foi localizada, tente novamente.")
             return "\n"
     mol_list = list(molnames)
-    mol_string = "/".join(mol_list)
-    new_item = f"{colname}: {mol_string}\n"
-    print(new_item)
+    mol_string = "|".join(mol_list)
+    new_item = f">{colname}:\n {mol_string}\n"
     return new_item
 
 def get_smiles(mol, smilesfile):
@@ -85,7 +84,7 @@ def get_sdf(mol, filesfolder):
     except OSError:
         print(f"O arquivo {mol_file} já existe. Pulando download...")
     except pcp.NotFoundError:
-        print(f"⚠️ Molécula '{mol}' não encontrada no PubChem. Pulando...")
+        print(f"Molécula '{mol}' não encontrada no PubChem. Pulando...")
     except pcp.PubChemHTTPError as e:
         print(f"Erro HTTP do PubChem: {e}")
     except HTTPError:
@@ -158,12 +157,11 @@ def main():
         print("Análise dos arquivos concluída.")
 
         #Criação do arquivo que conterá as moléculas das replicatas
-        joined_molecules_file = os.path.join(input_folder, "Moléculas_únicas.txt")
+        joined_molecules_file = os.path.join(input_folder, "Moléculas_únicas.msfa")
 
         #Escreve o header do arquivo que conterá as moléculas das replicatas
         with open(joined_molecules_file, "w") as mol_file:
-            mol_file.write("Moléculas únicas entre as replicatas: \n")
-            mol_file.write("\n")
+            mol_file.write("")
 
         #Obtém as replicatas do estudo
         available_reps = pd.ExcelFile(summary_file).sheet_names
@@ -185,7 +183,7 @@ def main():
                     mol_file.write(data_group) #Escreve os dados obtidos (replicatas: moléculas)
                     mol_file.write("\n") #Escreve quebra de linha para facilitar a leitura
                     data_group_list = data_group.split(":")
-                    data_groups[data_group_list[0]] = data_group_list[1].split("/")
+                    data_groups[data_group_list[0]] = data_group_list[1].split("|")
                     print(f"Replicatas {reps_string} analisadas.")
                     continue
                 else: #Caso não haja o input (usuário apertou enter, decidindo encerrar)
@@ -221,7 +219,7 @@ def main():
         #Parsing do dicionário com as moléculas de cada amostra
         for chave in data_groups:
             print(f"Analisando amostra {chave}...")
-            sample_sdf_folder = os.path.join(sdf_folder, chave)
+            sample_sdf_folder = os.path.join(sdf_folder, chave.strip(">"))
             if not os.path.exists(sample_sdf_folder):
                 os.mkdir(sample_sdf_folder)
             data_molecules = data_groups[chave] #Obtém a lista de moléculas relacionadas à cada estudo de replicatas/amostra isolada
