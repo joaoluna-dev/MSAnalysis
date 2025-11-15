@@ -58,7 +58,8 @@ def get_smiles(mol, smilesfile):
         compound = compound[0]
         if compound:
             with open(smilesfile, 'a') as sm_file:
-                sm_file.write(f"{compound.smiles}\t{mol}\n")
+                # SMILES    Name    CID    Charge   Molecular Weight    Molecular Formula   IUPAC Name  InChI   XLogP   TPSA   Hydrogen-bond donors   Hydrogen-bond acceptors\n"
+                sm_file.write(f"({str(compound.smiles).strip("\t").strip("\n")}\t{mol.strip(" ").strip("\t").strip("\n")}\t{str(compound.cid).strip("\t").strip("\n")}\t{str(compound.charge).strip("\t").strip("\n")}\t{str(compound.molecular_weight).strip("\t").strip("\n")}\t{str(compound.molecular_formula).strip("\t").strip("\n")}\t{str(compound.iupac_name).strip("\t").strip("\n")}\t{str(compound.inchi).strip("\t").strip("\n")}\t{str(compound.xlogp).strip("\t").strip("\n")}\t{str(compound.tpsa).strip("\t").strip("\n")}\t{str(compound.h_bond_donor_count).strip("\t").strip("\n")}\t{str(compound.h_bond_acceptor_count).strip("\t").strip("\n")}\n")
             print(f"SMILES e CID de {mol} obtidos.")
         else:
             print(f"Molécula {mol} não identificada no PUBCHEM. Verifique e tente novamente manualmente.")
@@ -209,9 +210,9 @@ def main():
             print(f"Analisando amostra {chave}...")
 
             # Criação de arquivo com os SMILES das moléculas
-            smiles_file = os.path.join(input_folder, f"{chave.strip(">")}_SMILES.txt")
+            smiles_file = os.path.join(input_folder, f"{chave.strip(">")}_molecules_data.txt")
             with open(smiles_file, 'w') as sm_file:
-                sm_file.write("SMILES\tNAME\n")
+                sm_file.write("SMILES\tName\tCID\tCharge\tMolecular_Weight\tMolecular_Formula\tIUPAC_Name\tInChI\tXLogP\tTPSA\tHydrogen_bond_donors\tHydrogen_bond_acceptors\n")
 
             sample_sdf_folder = os.path.join(sdf_folder, chave.strip(">"))
             if not os.path.exists(sample_sdf_folder):
