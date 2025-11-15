@@ -48,7 +48,7 @@ def unite_data(summary, repslist, extension, colname, allreps):
             return "\n"
     mol_list = list(molnames)
     mol_string = "|".join(mol_list)
-    new_item = f">{colname}:\n {mol_string}\n"
+    new_item = f">{colname}:\n{mol_string}\n"
     return new_item
 
 def get_smiles(mol, smilesfile):
@@ -58,19 +58,12 @@ def get_smiles(mol, smilesfile):
         compound = compound[0]
         if compound:
             with open(smilesfile, 'a') as sm_file:
-                sm_file.write(f"{mol}\n")
-                sm_file.write(f"CID: {compound.cid}\n")
-                sm_file.write(f"SMILES: {compound.smiles}\n")
-                sm_file.write("-------------------------------------------\n")
+                sm_file.write(f"{compound.smiles}\t{mol}\n")
             print(f"SMILES e CID de {mol} obtidos.")
         else:
             print(f"Molécula {mol} não identificada no PUBCHEM. Verifique e tente novamente manualmente.")
     else:
         print(f"A busca pela molécula {mol} não retornou resultados. Tente novamente manualmente mais tarde.")
-        with open(smilesfile, 'a') as sm_file:
-            sm_file.write(f"{mol}\n")
-            sm_file.write(f"A busca pela molécula {mol} não retornou resultados. Tente novamente manualmente mais tarde.\n")
-            sm_file.write("-------------------------------------------\n")
 
 def get_sdf(mol, filesfolder):
     print(f"Iniciando o download da molécula {mol}...")
@@ -84,7 +77,7 @@ def get_sdf(mol, filesfolder):
     except OSError:
         print(f"O arquivo {mol_file} já existe. Pulando download...")
     except pcp.NotFoundError:
-        print(f"Molécula '{mol}' não encontrada no PubChem. Pulando...")
+        print(f"⚠️ Molécula '{mol}' não encontrada no PubChem. Pulando...")
     except pcp.PubChemHTTPError as e:
         print(f"Erro HTTP do PubChem: {e}")
     except HTTPError:
@@ -211,21 +204,21 @@ def main():
         if not os.path.exists(sdf_folder):
             os.mkdir(sdf_folder)
 
-        #Criação de arquivo com os SMILES das moléculas
-        smiles_file = os.path.join(input_folder, "SMILES.txt")
-        with open(smiles_file, 'w') as sm_file:
-            sm_file.write("Moléculas e seus smiles: \n")
-
         #Parsing do dicionário com as moléculas de cada amostra
         for chave in data_groups:
             print(f"Analisando amostra {chave}...")
+
+            # Criação de arquivo com os SMILES das moléculas
+            smiles_file = os.path.join(input_folder, f"{chave.strip(">")}_SMILES.txt")
+            with open(smiles_file, 'w') as sm_file:
+                sm_file.write("SMILES\tNAME\n")
+
             sample_sdf_folder = os.path.join(sdf_folder, chave.strip(">"))
             if not os.path.exists(sample_sdf_folder):
                 os.mkdir(sample_sdf_folder)
+
             data_molecules = data_groups[chave] #Obtém a lista de moléculas relacionadas à cada estudo de replicatas/amostra isolada
             with open(smiles_file, 'a') as sm_file:
-                sm_file.write(f"{chave}:\n")
-                sm_file.write("\n")
                 for molecule in data_molecules: #Itera sobre as moléculas de cada lista
                     get_smiles(mol=molecule, smilesfile=smiles_file) #Obtém os SMILES e o CID de cada molécula
                     get_sdf(mol=molecule, filesfolder=sample_sdf_folder) #Obtém o arquivo .SDF de cada molécula
